@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full bg-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>經典撲克遊戲館 - 大老二 & 抽鬼牌</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        /* Poker Felt Table Background */
+        .poker-felt {
+            background: radial-gradient(circle at center, #1e5e2e 0%, #0d3817 70%, #05220c 100%);
+            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Card Container & Perspective */
+        .card-container {
+            perspective: 1000px;
+        }
+        
+        /* Card Flip & Selection Transitions */
+        .card-item {
+            transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease;
+            transform-style: preserve-3d;
+        }
+        
+        .card-item.selected {
+            transform: translateY(-22px) scale(1.03);
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.5);
+        }
+
+        .card-item:hover:not(.selected) {
+            transform: translateY(-8px);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="h-full text-slate-100 flex flex-col justify-between overflow-x-hidden selection:bg-amber-500 selection:text-slate-900">
+
+    <!-- Header Navigation Bar -->
+    <header class="bg-slate-950/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-3 sm:px-6 py-2.5 shadow-xl">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 to-yellow-400 flex items-center justify-center font-black text-slate-950 text-2xl shadow-md border border-amber-300">
+                    ♠
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-black text-amber-400 tracking-wide">經典撲克遊戲館</h1>
+                    <p id="game-subtitle" class="text-[11px] text-slate-400">請選擇遊戲：大老二 或 抽鬼牌</p>
+                </div>
+            </div>
+
+            <!-- Stats & Quick Actions Bar -->
+            <div class="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-inner">
+                    <span class="text-slate-400 font-medium">💰 籌碼:</span>
+                    <span id="nav-coins" class="font-bold text-amber-400 font-mono text-sm sm:text-base">1,000</span>
+                </div>
+
+                <button id="btn-sound-toggle" onclick="toggleAudio()" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-slate-200 transition" title="聲音開關">
+                    🔊
+                </button>
+                <button onclick="openModal('modal-instructions')" class="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-slate-200 transition font-bold flex items-center gap-1 text-xs">
+                    📖 規則說明
+                </button>
+                <button onclick="openModal('modal-stats')" class="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-slate-200 transition font-bold flex items-center gap-1 text-xs">
+                    📊 戰績榜
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game View -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 flex flex-col justify-between gap-3">
+        
+        <!-- Game Selection Lobby (Shown when no game is active) -->
+        <div id="view-lobby" class="flex-1 flex flex-col items-center justify-center py-8 px-4">
+            <h2 class="text-2xl sm:text-3xl font-black text-amber-400 mb-2 text-center">選擇你想挑戰的經典撲克</h2>
+            <p class="text-slate-400 text-sm mb-8 text-center max-w-md">單人與 3 位智慧 AI 電腦對戰，紀錄將自動儲存於瀏覽器！</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full">
+                <!-- Big Two Card -->
+                <div onclick="selectGame('bigtwo')" class="bg-gradient-to-br from-slate-900 to-slate-950 hover:from-slate-800 hover:to-slate-900 border-2 border-amber-500/40 hover:border-amber-400 rounded-3xl p-6 cursor-pointer transition transform hover:-translate-y-1 shadow-2xl flex flex-col justify-between group">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-3xl p-3 bg-amber-500/10 rounded-2xl border border-amber-500/30">♣️3</span>
+                            <span class="text-xs px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">經典策略</span>
+                        </div>
+                        <h3 class="text-2xl font-extrabold text-slate-100 group-hover:text-amber-400 transition">大老二 (Big Two)</h3>
+                        <p class="text-slate-400 text-xs sm:text-sm mt-2 leading-relaxed">
+                            支援單張、對子、五張牌組合（順子、同花、葫蘆、鐵支、同花順）。梅花3先出，黑桃2最大！最快出完手牌者獲勝。
+                        </p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
+                        <span id="lobby-bigtwo-stats">勝率: 0% (0勝/0場)</span>
+                        <span class="text-amber-400 font-bold group-hover:translate-x-1 transition">進入遊戲 →</span>
+                    </div>
+                </div>
+
+                <!-- Old Maid Card -->
+                <div onclick="selectGame('oldmaid')" class="bg-gradient-to-br from-slate-900 to-slate-950 hover:from-slate-800 hover:to-slate-900 border-2 border-rose-500/40 hover:border-rose-400 rounded-3xl p-6 cursor-pointer transition transform hover:-translate-y-1 shadow-2xl flex flex-col justify-between group">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-3xl p-3 bg-rose-500/10 rounded-2xl border border-rose-500/30">🃏</span>
+                            <span class="text-xs px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40">心理博弈</span>
+                        </div>
+                        <h3 class="text-2xl font-extrabold text-slate-100 group-hover:text-rose-400 transition">抽鬼牌 (Old Maid)</h3>
+                        <p class="text-slate-400 text-xs sm:text-sm mt-2 leading-relaxed">
+                            發放包含一張鬼牌的撲克牌，自動對消相同點數的配對。輪流向鄰居抽牌，最終留有鬼牌者落敗！
+                        </p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
+                        <span id="lobby-oldmaid-stats">勝率: 0% (0勝/0場)</span>
+                        <span class="text-rose-400 font-bold group-hover:translate-x-1 transition">進入遊戲 →</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Game Table Area -->
+        <div id="view-game" class="hidden flex-1 flex flex-col justify-between">
+            
+            <!-- Felt Table Container -->
+            <div class="poker-felt border-4 sm:border-8 border-amber-950/80 rounded-[32px] sm:rounded-[50px] p-3 sm:p-6 flex-1 flex flex-col justify-between relative min-h-[520px] shadow-2xl border-double overflow-hidden">
+                
+                <!-- TOP PLAYER: AI 2 -->
+                <div class="w-full flex flex-col items-center z-10">
+                    <div id="ai2-box" class="flex items-center gap-2 bg-slate-950/80 border border-slate-700/80 rounded-2xl px-4 py-1.5 shadow-md">
+                        <div class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-sm border border-slate-600">🤖</div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-xs sm:text-sm text-slate-200">電腦 2 (北)</span>
+                                <span id="ai2-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-bold">等待中</span>
+                            </div>
+                            <span id="ai2-count" class="text-[11px] text-amber-400 font-mono">13 張</span>
+                        </div>
+                    </div>
+                    <!-- AI 2 Hand Cards Back side preview -->
+                    <div id="ai2-hand" class="flex -space-x-4 sm:-space-x-6 my-2 min-h-[50px] justify-center items-center scale-75 origin-top"></div>
+                </div>
+
+                <!-- MIDDLE ROW: AI 1 (Left), Center Desk, AI 3 (Right) -->
+                <div class="grid grid-cols-12 items-center w-full my-auto z-10 gap-1">
+                    
+                    <!-- LEFT PLAYER: AI 1 -->
+                    <div class="col-span-3 sm:col-span-3 flex flex-col items-start space-y-1">
+                        <div id="ai1-box" class="flex items-center gap-2 bg-slate-950/80 border border-slate-700/80 rounded-2xl p-2 shadow-md">
+                            <div class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-sm border border-slate-600">🤖</div>
+                            <div class="hidden sm:block">
+                                <span class="font-bold text-xs text-slate-200">電腦 1 (西)</span>
+                                <p id="ai1-count" class="text-[11px] text-amber-400 font-mono">13 張</p>
+                            </div>
+                        </div>
+                        <span id="ai1-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-bold">等待中</span>
+                        <div id="ai1-hand" class="flex -space-x-8 my-1 min-h-[50px] scale-75 origin-left"></div>
+                    </div>
+
+                    <!-- CENTER DISCARD & BOARD AREA -->
+                    <div class="col-span-6 sm:col-span-6 flex flex-col items-center justify-center text-center px-1">
+                        
+                        <!-- Pot / Status Box -->
+                        <div class="bg-black/60 border border-amber-500/30 rounded-2xl px-4 py-1.5 mb-2 backdrop-blur-md shadow-lg">
+                            <span id="board-title" class="text-[10px] sm:text-xs text-amber-300 font-bold uppercase tracking-wider block">當前桌面牌型</span>
+                            <span id="board-combo-type" class="text-xs sm:text-sm font-extrabold text-amber-400">自由出牌</span>
+                        </div>
+
+                        <!-- Played Cards Showcase -->
+                        <div id="desk-cards" class="flex flex-wrap gap-1 sm:gap-2 justify-center items-center min-h-[90px] sm:min-h-[110px] p-2 bg-black/20 rounded-2xl border border-white/5 backdrop-blur-xs w-full">
+                            <span class="text-xs text-slate-400 italic">點擊「開始遊戲」發牌</span>
+                        </div>
+
+                        <!-- Dynamic Status Announcement Banner -->
+                        <div id="status-banner" class="text-xs font-semibold text-amber-200 bg-slate-950/90 px-4 py-1.5 rounded-full border border-amber-500/30 mt-2 shadow text-center max-w-md truncate">
+                            請點擊下方的開始按鈕
+                        </div>
+                    </div>
+
+                    <!-- RIGHT PLAYER: AI 3 -->
+                    <div class="col-span-3 sm:col-span-3 flex flex-col items-end space-y-1">
+                        <div id="ai3-box" class="flex items-center gap-2 bg-slate-950/80 border border-slate-700/80 rounded-2xl p-2 shadow-md">
+                            <div class="hidden sm:block text-right">
+                                <span class="font-bold text-xs text-slate-200">電腦 3 (東)</span>
+                                <p id="ai3-count" class="text-[11px] text-amber-400 font-mono">13 張</p>
+                            </div>
+                            <div class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-sm border border-slate-600">🤖</div>
+                        </div>
+                        <span id="ai3-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-bold">等待中</span>
+                        <div id="ai3-hand" class="flex -space-x-8 my-1 min-h-[50px] scale-75 origin-right"></div>
+                    </div>
+
+                </div>
+
+                <!-- BOTTOM PLAYER: HUMAN USER -->
+                <div class="w-full flex flex-col items-center z-10 mt-2">
+                    
+                    <!-- Human Player Info Tag -->
+                    <div class="flex items-center gap-3 bg-slate-950/90 border border-amber-500/40 rounded-full px-4 py-1 mb-2 shadow-md">
+                        <div class="w-7 h-7 rounded-full bg-amber-500 flex items-center justify-center text-sm text-slate-950 font-black">👤</div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-xs sm:text-sm text-slate-100">你的手牌</span>
+                            <span id="player-count-badge" class="text-[11px] text-amber-400 font-mono font-bold">(0張)</span>
+                        </div>
+                    </div>
+
+                    <!-- Human Hand Interactive Cards Container -->
+                    <div id="player-hand" class="flex -space-x-5 sm:-space-x-7 md:-space-x-8 pb-2 pt-6 min-h-[120px] max-w-full overflow-x-auto justify-center items-end px-4">
+                        <!-- Rendered Player Hand Cards -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Action Control Toolbar -->
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 shadow-xl mt-3 flex flex-wrap items-center justify-between gap-2">
+                <button onclick="returnToLobby()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl border border-slate-700 text-xs transition">
+                    ⬅ 離開大廳
+                </button>
+
+                <div id="action-buttons-container" class="flex flex-wrap items-center gap-2 justify-center flex-1">
+                    <button id="btn-start" onclick="startGame()" class="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black rounded-xl shadow-lg shadow-amber-500/20 text-xs sm:text-sm transition transform active:scale-95">
+                        ▶ 開始新局
+                    </button>
+                    <button id="btn-play" onclick="humanPlayCards()" class="hidden px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 text-xs sm:text-sm transition active:scale-95 disabled:opacity-40">
+                        出牌
+                    </button>
+                    <button id="btn-hint" onclick="humanGetHint()" class="hidden px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs sm:text-sm transition active:scale-95 disabled:opacity-40">
+                        💡 提示
+                    </button>
+                    <button id="btn-pass" onclick="humanPass()" class="hidden px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold rounded-xl border border-slate-600 text-xs sm:text-sm transition active:scale-95 disabled:opacity-40">
+                        Pass (過)
+                    </button>
+                    <button id="btn-draw" onclick="humanDrawCardFromNeighbor()" class="hidden px-6 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-lg shadow-rose-600/20 text-xs sm:text-sm transition active:scale-95">
+                        🃏 抽取鄰居張牌
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer Status -->
+    <footer class="bg-slate-950 border-t border-slate-900 px-4 py-2">
+        <div class="max-w-7xl mx-auto flex items-center justify-between text-[11px] text-slate-400">
+            <span id="footer-status" class="truncate font-mono">系統準備就緒，請選擇遊戲。</span>
+            <button onclick="resetStats()" class="text-rose-400 hover:text-rose-300 underline">重置戰績</button>
+        </div>
+    </footer>
+
+    <!-- MODAL 1: Instructions & Game Rules -->
+    <div id="modal-instructions" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+                <h3 class="text-base sm:text-lg font-black text-amber-400 flex items-center gap-2">
+                    <span>📖</span> 遊戲規則說明
+                </h3>
+                <button onclick="closeModal('modal-instructions')" class="text-slate-400 hover:text-white text-xl font-bold px-2">&times;</button>
+            </div>
+            
+            <div class="p-5 overflow-y-auto space-y-6 text-xs sm:text-sm text-slate-300">
+                <!-- Big Two Rules -->
+                <div>
+                    <h4 class="text-amber-300 font-bold border-b border-slate-800 pb-1 mb-2 text-sm">♠ 大老二 (Big Two) 規則</h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-300 leading-relaxed">
+                        <li><strong>數字大小：</strong> 2 > A > K > Q > J > 10 > 9 > 8 > 7 > 6 > 5 > 4 > 3。</li>
+                        <li><strong>花色大小：</strong> 黑桃 ♠ > 紅心 ♥ > 方塊 ♦ > 梅花 ♣。</li>
+                        <li><strong>手牌組合：</strong> 支援單張、對子、五張牌（順子、同花、葫蘆、鐵支、同花順）。</li>
+                        <li><strong>先手規則：</strong> 第一局首輪持有「梅花 3」者必須先出牌，且出的牌型必須包含梅花 3。</li>
+                        <li><strong>出牌規則：</strong> 必須壓過前一位玩家出的牌型（牌型需相同且點數/花色較大）。若無牌可壓可選擇 Pass。</li>
+                    </ul>
+                </div>
+
+                <!-- Old Maid Rules -->
+                <div>
+                    <h4 class="text-rose-300 font-bold border-b border-slate-800 pb-1 mb-2 text-sm">🃏 抽鬼牌 (Old Maid) 規則</h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-300 leading-relaxed">
+                        <li><strong>發牌與對消：</strong> 牌庫包含 52 張普通牌與 1 張鬼牌 (Joker)。發牌完畢後，系統會自動幫所有人丟棄手牌中點數相同的對子。</li>
+                        <li><strong>順序抽牌：</strong> 玩家與 3 位 AI 輪流順時針向自己的鄰居（左側玩家）隨機抽取一張牌。</li>
+                        <li><strong>自動配對：</strong> 抽到牌後若與自己手牌點數相同，將自動配對並丟棄。</li>
+                        <li><strong>勝負判定：</strong> 率先清空手牌者脫逃成功，最終手中留下鬼牌 (Joker) 的玩家為敗者。</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-800 bg-slate-950 text-right">
+                <button onclick="closeModal('modal-instructions')" class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition">了解！</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Stats Modal -->
+    <div id="modal-stats" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+                <h3 class="text-base sm:text-lg font-black text-amber-400 flex items-center gap-2">
+                    <span>📊</span> 玩家個人歷史戰績
+                </h3>
+                <button onclick="closeModal('modal-stats')" class="text-slate-400 hover:text-white text-xl font-bold px-2">&times;</button>
+            </div>
+            
+            <div class="p-5 overflow-y-auto space-y-5 text-xs sm:text-sm">
+                <!-- Big Two Stats -->
+                <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                    <h4 class="text-amber-400 font-bold mb-3 flex items-center justify-between">
+                        <span>♠ 大老二戰績</span>
+                        <span id="stat-bigtwo-winrate" class="text-xs font-mono text-amber-300">勝率 0%</span>
+                    </h4>
+                    <div class="grid grid-cols-3 gap-2 text-center font-mono">
+                        <div class="bg-slate-900 p-2 rounded-xl">
+                            <span class="text-[10px] text-slate-400 block">總局數</span>
+                            <span id="stat-bigtwo-games" class="font-bold text-slate-200">0</span>
+                        </div>
+                        <div class="bg-slate-900 p-2 rounded-xl">
+                            <span class="text-[10px] text-slate-400 block">勝場</span>
+                            <span id="stat-bigtwo-wins" class="font-bold text-emerald-400">0</span>
+                        </div>
+                        <div class="bg-slate-900 p-2 rounded-xl">
+                            <span class="text-[10px] text-slate-400 block">最高連勝</span>
+                            <span id="stat-bigtwo-streak" class="font-bold text-amber-400">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Old Maid Stats -->
+                <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                    <h4 class="text-rose-400 font-bold mb-3 flex items-center justify-between">
+                        <span>🃏 抽鬼牌戰績</span>
+                        <span id="stat-oldmaid-winrate" class="text-xs font-mono text-rose-300">勝率 0%</span>
+                    </h4>
+                    <div class="grid grid-cols-3 gap-2 text-center font-mono">
+                        <div class="bg-slate-900 p-2 rounded-xl">
+                            <span class="text-[10px] text-slate-400 block">總局數</span>
+                            <span id="stat-oldmaid-games" class="font-bold text-slate-200">0</span>
+                        </div>
+                        <div class="bg-slate-900 p-2 rounded-xl">
+                            <span class="text-[10px] text-slate-400 block">勝場</span>
+                            <span id="stat-oldmaid-wins" class="font-bold text-emerald-400">0</span>
+                        </div>
+                        <div class="bg-slate-900 p-2 rounded-xl">
+                            <span class="text-[10px] text-slate-400 block">最高連勝</span>
+                            <span id="stat-oldmaid-streak" class="font-bold text-rose-400">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-800 bg-slate-950 flex items-center justify-between">
+                <button onclick="resetStats()" class="px-4 py-2 bg-rose-900/50 hover:bg-rose-800 border border-rose-700 text-rose-200 font-bold rounded-xl text-xs transition">清除所有戰績</button>
+                <button onclick="closeModal('modal-stats')" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Core -->
+    <script>
+        /* ==========================================================================
+           1. AUDIO SYNTHESIZER (Web Audio API - Synthesized without external files)
+           ========================================================================== */
+        let soundEnabled = true;
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function toggleAudio() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('btn-sound-toggle');
+            btn.textContent = soundEnabled ? '🔊' : '🔇';
+            btn.classList.toggle('opacity-50', !soundEnabled);
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioContext();
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'card') {
+                    // Quick friction sound
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(350, now);
+                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.08);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'play') {
+                    // Play card slap
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'match') {
+                    // Pair match chime
+                    const notes = [523.25, 659.25];
+                    notes.forEach((freq, i) => {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.connect(g);
+                        g.connect(ctx.destination);
+                        o.frequency.setValueAtTime(freq, now + i * 0.06);
+                        g.gain.setValueAtTime(0.15, now + i * 0.06);
+                        g.gain.linearRampToValueAtTime(0.01, now + i * 0.06 + 0.15);
+                        o.start(now + i * 0.06);
+                        o.stop(now + i * 0.06 + 0.15);
+                    });
+                } else if (type === 'win') {
+                    // Fanfare chime
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, i) => {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.connect(g);
+                        g.connect(ctx.destination);
+                        o.frequency.setValueAtTime(freq, now + i * 0.08);
+                        g.gain.setValueAtTime(0.2, now + i * 0.08);
+                        g.gain.linearRampToValueAtTime(0.01, now + i * 0.08 + 0.25);
+                        o.start(now + i * 0.08);
+                        o.stop(now + i * 0.08 + 0.25);
+                    });
+                } else if (type === 'pass') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.exponentialRampToValueAtTime(90, now + 0.12);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                }
+            } catch (e) {
+                console.error("Audio trigger failed:", e);
+            }
+        }
+
+        /* ==========================================================================
+           2. DATA STRUCTURES & LOCALSTORAGE PERSISTENCE
+           ========================================================================== */
+        const SUITS = ['♣', '♦', '♥', '♠']; // Big Two suit order: Clubs < Diamonds < Hearts < Spades
+        const VALUES_BIGTWO = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+        const VALUE_RANKS_BIGTWO = {
+            '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, '10': 8,
+            'J': 9, 'Q': 10, 'K': 11, 'A': 12, '2': 13
+        };
+        const SUIT_RANKS_BIGTWO = { '♣': 1, '♦': 2, '♥': 3, '♠': 4 };
+
+        let stats = {
+            coins: 1000,
+            bigtwo: { games: 0, wins: 0, streak: 0, maxStreak: 0 },
+            oldmaid: { games: 0, wins: 0, streak: 0, maxStreak: 0 }
+        };
+
+        let activeGame = null; // 'bigtwo' or 'oldmaid'
+        let selectedCards = []; // Human selected indices
+
+        // Game state parameters
+        let players = [
+            { id: 0, name: '你 (Player)', hand: [], isAI: false },
+            { id: 1, name: '電腦 1', hand: [], isAI: true },
+            { id: 2, name: '電腦 2', hand: [], isAI: true },
+            { id: 3, name: '電腦 3', hand: [], isAI: true }
+        ];
+
+        let turnIndex = 0;
+        let lastPlayedHand = null; // { cards: [], type: '', power: 0, owner: id }
+        let passCount = 0;
+        let gameFinished = false;
+
+        function loadStats() {
+            const saved = localStorage.getItem('poker_hub_stats_v2');
+            if (saved) {
+                try {
+                    stats = { ...stats, ...JSON.parse(saved) };
+                } catch (e) {
+                    console.error("Failed loading stats:", e);
+                }
+            }
+            updateStatsUI();
+        }
+
+        function saveStats() {
+            localStorage.setItem('poker_hub_stats_v2', JSON.stringify(stats));
+            updateStatsUI();
+        }
+
+        function resetStats() {
+            if (confirm("確定要重置所有遊戲戰績與籌碼紀錄嗎？")) {
+                localStorage.removeItem('poker_hub_stats_v2');
+                stats = {
+                    coins: 1000,
+                    bigtwo: { games: 0, wins: 0, streak: 0, maxStreak: 0 },
+                    oldmaid: { games: 0, wins: 0, streak: 0, maxStreak: 0 }
+                };
+                saveStats();
+                updateStatsUI();
+                alert("已成功重置所有紀錄！");
+            }
+        }
+
+        /* ==========================================================================
+           STREAMING_CHUNK:Card utilities & Big Two rule evaluator...
+           3. CARD DECK GENERATOR & BIG TWO RULES ENGINE
+           ========================================================================== */
+        function createStandardDeck(includeJoker = false) {
+            const deck = [];
+            let id = 1;
+            for (let suit of SUITS) {
+                for (let val of VALUES_BIGTWO) {
+                    deck.push({
+                        id: id++,
+                        suit: suit,
+                        value: val,
+                        rank: VALUE_RANKS_BIGTWO[val],
+                        suitRank: SUIT_RANKS_BIGTWO[suit]
+                    });
+                }
+            }
+            if (includeJoker) {
+                deck.push({
+                    id: 99,
+                    suit: '🃏',
+                    value: 'JOKER',
+                    rank: 99,
+                    suitRank: 99,
+                    isJoker: true
+                });
+            }
+            return shuffle(deck);
+        }
+
+        function shuffle(deck) {
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        }
+
+        // Sort hand by Big Two power: Rank first, then Suit rank
+        function sortBigTwoHand(hand) {
+            return hand.sort((a, b) => {
+                if (a.rank !== b.rank) return a.rank - b.rank;
+                return a.suitRank - b.suitRank;
+            });
+        }
+
+        /* Big Two Card Combination Validator */
+        const BIGTWO_TYPES = {
+            SINGLE: '單張',
+            PAIR: '對子',
+            STRAIGHT: '順子',
+            FLUSH: '同花',
+            FULL_HOUSE: '葫蘆',
+            FOUR_OF_A_KIND: '鐵支',
+            STRAIGHT_FLUSH: '同花順',
+            INVALID: '無效牌型'
+        };
+
+        function evaluateBigTwoCombination(cards) {
+            if (!cards || cards.length === 0) return { type: BIGTWO_TYPES.INVALID, power: 0 };
+            
+            const sorted = sortBigTwoHand([...cards]);
+            const len = cards.length;
+
+            if (len === 1) {
+                const c = sorted[0];
+                return {
+                    type: BIGTWO_TYPES.SINGLE,
+                    power: c.rank * 10 + c.suitRank,
+                    topCard: c
+                };
+            }
+
+            if (len === 2) {
+                if (sorted[0].value === sorted[1].value) {
+                    const topCard = sorted[1]; // Highest suit in pair
+                    return {
+                        type: BIGTWO_TYPES.PAIR,
+                        power: topCard.rank * 10 + topCard.suitRank,
+                        topCard: topCard
+                    };
+                }
+                return { type: BIGTWO_TYPES.INVALID, power: 0 };
+            }
+
+            if (len === 5) {
+                const isFlush = sorted.every(c => c.suit === sorted[0].suit);
+                
+                // Check Straight
+                let isStraight = true;
+                for (let i = 0; i < 4; i++) {
+                    if (sorted[i + 1].rank !== sorted[i].rank + 1) {
+                        isStraight = false;
+                        break;
+                    }
+                }
+
+                if (isStraight && isFlush) {
+                    const topCard = sorted[4];
+                    return { type: BIGTWO_TYPES.STRAIGHT_FLUSH, power: 70000 + topCard.rank * 10 + topCard.suitRank, topCard };
+                }
+
+                // Check Four of a Kind (4 + 1)
+                const rankCounts = {};
+                sorted.forEach(c => rankCounts[c.rank] = (rankCounts[c.rank] || 0) + 1);
+                const counts = Object.entries(rankCounts).map(([r, count]) => ({ rank: parseInt(r), count }));
+                counts.sort((a, b) => b.count - a.count);
+
+                if (counts[0].count === 4) {
+                    return { type: BIGTWO_TYPES.FOUR_OF_A_KIND, power: 60000 + counts[0].rank * 10 };
+                }
+
+                // Check Full House (3 + 2)
+                if (counts[0].count === 3 && counts[1].count === 2) {
+                    return { type: BIGTWO_TYPES.FULL_HOUSE, power: 50000 + counts[0].rank * 10 };
+                }
+
+                if (isFlush) {
+                    const topCard = sorted[4];
+                    return { type: BIGTWO_TYPES.FLUSH, power: 40000 + topCard.suitRank * 100 + topCard.rank, topCard };
+                }
+
+                if (isStraight) {
+                    const topCard = sorted[4];
+                    return { type: BIGTWO_TYPES.STRAIGHT, power: 30000 + topCard.rank * 10 + topCard.suitRank, topCard };
+                }
+            }
+
+            return { type: BIGTWO_TYPES.INVALID, power: 0 };
+        }
+
+        function canBeatLastHand(candidate, lastHand) {
+            if (!lastHand) return candidate.type !== BIGTWO_TYPES.INVALID;
+            if (candidate.type === BIGTWO_TYPES.INVALID) return false;
+            
+            if (candidate.cards.length !== lastHand.cards.length) return false;
+
+            // 5-Card CombinationsHierarchy: Straight Flush > 4 of Kind > Full House > Flush > Straight
+            const comboRank = {
+                '順子': 1, '同花': 2, '葫蘆': 3, '鐵支': 4, '同花順': 5
+            };
+
+            if (candidate.cards.length === 5) {
+                const candRank = comboRank[candidate.type];
+                const lastRank = comboRank[lastHand.type];
+                if (candRank !== lastRank) {
+                    return candRank > lastRank;
+                }
+            } else {
+                if (candidate.type !== lastHand.type) return false;
+            }
+
+            return candidate.power > lastHand.power;
+        }
+
+        /* ==========================================================================
+           STREAMING_CHUNK:Lobby & Game View Switching...
+           4. LOBBY & NAVIGATION
+           ========================================================================== */
+        function selectGame(gameType) {
+            activeGame = gameType;
+            document.getElementById('view-lobby').classList.add('hidden');
+            document.getElementById('view-game').classList.remove('hidden');
+
+            const subtitle = document.getElementById('game-subtitle');
+            subtitle.textContent = gameType === 'bigtwo' ? '正在遊玩：大老二 (Big Two)' : '正在遊玩：抽鬼牌 (Old Maid)';
+
+            // Set Action Buttons
+            document.getElementById('btn-play').classList.toggle('hidden', gameType !== 'bigtwo');
+            document.getElementById('btn-hint').classList.toggle('hidden', gameType !== 'bigtwo');
+            document.getElementById('btn-pass').classList.toggle('hidden', gameType !== 'bigtwo');
+            document.getElementById('btn-draw').classList.toggle('hidden', gameType !== 'oldmaid');
+
+            resetTableUI();
+            logFooter(`已進入 ${gameType === 'bigtwo' ? '大老二' : '抽鬼牌'} 遊戲頁面，點擊「開始新局」發牌。`);
+        }
+
+        function returnToLobby() {
+            document.getElementById('view-lobby').classList.remove('hidden');
+            document.getElementById('view-game').classList.add('hidden');
+            document.getElementById('game-subtitle').textContent = '請選擇遊戲：大老二 或 抽鬼牌';
+            updateStatsUI();
+            logFooter('已返回主大廳。');
+        }
+
+        /* ==========================================================================
+           STREAMING_CHUNK:Big Two Game Execution & AI Logic...
+           5. BIG TWO GAME LOOP
+           ========================================================================== */
+        function startBigTwo() {
+            gameFinished = false;
+            passCount = 0;
+            lastPlayedHand = null;
+            selectedCards = [];
+
+            const deck = createStandardDeck(false);
+
+            // Deal 13 cards to 4 players
+            players.forEach((p, idx) => {
+                p.hand = sortBigTwoHand(deck.slice(idx * 13, (idx + 1) * 13));
+            });
+
+            // Find player holding 3 of Clubs (♣3)
+            turnIndex = 0;
+            players.forEach((p, idx) => {
+                if (p.hand.some(c => c.value === '3' && c.suit === '♣')) {
+                    turnIndex = idx;
+                }
+            });
+
+            updateTableBoard("3 of Clubs Start", "自由出牌 (需包含 ♣3)");
+            logBanner(`${players[turnIndex].name} 手持【梅花 3】，由其開局先出牌！`);
+            playSound('card');
+
+            renderAllHands();
+            processTurn();
+        }
+
+        function processTurn() {
+            if (gameFinished) return;
+
+            renderAllHands();
+            updateTurnBadges();
+
+            const currentP = players[turnIndex];
+
+            // If 3 pass in a row, clear last played hand
+            if (passCount >= 3) {
+                lastPlayedHand = null;
+                passCount = 0;
+                updateTableBoard("新一輪自由出牌", "自由出牌");
+                logBanner(`其他人皆 Pass，由 ${currentP.name} 獲得自由出牌權！`);
+            }
+
+            if (currentP.isAI) {
+                // Disable Human buttons
+                toggleHumanControls(false);
+                setTimeout(() => {
+                    aiBigTwoPlay(currentP);
+                }, 1000);
+            } else {
+                // Human Turn
+                toggleHumanControls(true);
+                logBanner("輪到你的回合，請選擇手牌出牌或 Pass");
+            }
+        }
+
+        function humanPlayCards() {
+            if (turnIndex !== 0 || gameFinished) return;
+
+            if (selectedCards.length === 0) {
+                alert("請點擊選取要出的牌！");
+                return;
+            }
+
+            const chosenCards = selectedCards.map(idx => players[0].hand[idx]);
+            const evalResult = evaluateBigTwoCombination(chosenCards);
+
+            if (evalResult.type === BIGTWO_TYPES.INVALID) {
+                alert("您選擇的牌型不符合大老二規則！");
+                return;
+            }
+
+            // Must include ♣3 on very first play of the game
+            const isFirstMoveOfGame = !lastPlayedHand && players.some(p => p.hand.length === 13);
+            if (isFirstMoveOfGame) {
+                const hasClub3 = chosenCards.some(c => c.value === '3' && c.suit === '♣');
+                if (!hasClub3) {
+                    alert("首局第一手出牌必須包含【梅花 3】！");
+                    return;
+                }
+            }
+
+            const candidate = {
+                cards: chosenCards,
+                type: evalResult.type,
+                power: evalResult.power,
+                owner: 0
+            };
+
+            if (!canBeatLastHand(candidate, lastPlayedHand)) {
+                alert("您出的牌型無法壓過桌面上的牌！");
+                return;
+            }
+
+            // Execute play
+            executeCardPlay(0, candidate);
+        }
+
+        function humanPass() {
+            if (turnIndex !== 0 || gameFinished) return;
+
+            if (!lastPlayedHand) {
+                alert("自由出牌回合不可 Pass，必須出牌！");
+                return;
+            }
+
+            passCount++;
+            playSound('pass');
+            logBanner(`你選擇了 Pass。`);
+            advanceTurn();
+        }
+
+        function humanGetHint() {
+            if (turnIndex !== 0 || gameFinished) return;
+
+            selectedCards = [];
+            const pHand = players[0].hand;
+
+            // Simple hint search
+            let foundIndices = [];
+            if (!lastPlayedHand) {
+                // Suggest smallest card
+                foundIndices = [0];
+            } else {
+                // Find single or pair that beats lastHand
+                const reqLen = lastPlayedHand.cards.length;
+                if (reqLen === 1) {
+                    for (let i = 0; i < pHand.length; i++) {
+                        const ev = evaluateBigTwoCombination([pHand[i]]);
+                        if (canBeatLastHand({ cards: [pHand[i]], type: ev.type, power: ev.power }, lastPlayedHand)) {
+                            foundIndices = [i];
+                            break;
+                        }
+                    }
+                } else if (reqLen === 2) {
+                    for (let i = 0; i < pHand.length - 1; i++) {
+                        if (pHand[i].value === pHand[i + 1].value) {
+                            const ev = evaluateBigTwoCombination([pHand[i], pHand[i + 1]]);
+                            if (canBeatLastHand({ cards: [pHand[i], pHand[i + 1]], type: ev.type, power: ev.power }, lastPlayedHand)) {
+                                foundIndices = [i, i + 1];
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (foundIndices.length > 0) {
+                selectedCards = foundIndices;
+                renderPlayerHand();
+                logBanner("💡 已為您提示可壓過的最佳牌型！");
+            } else {
+                alert("手牌中無可壓過當前桌面的組合，建議 Pass。");
+            }
+        }
+
+        function aiBigTwoPlay(aiPlayer) {
+            const hand = aiPlayer.hand;
+            let candidate = null;
+
+            const isFirstMoveOfGame = !lastPlayedHand && players.some(p => p.hand.length === 13);
+
+            if (!lastPlayedHand) {
+                // Free play
+                if (isFirstMoveOfGame) {
+                    // Must play single ♣3 or combo containing ♣3
+                    const club3Idx = hand.findIndex(c => c.value === '3' && c.suit === '♣');
+                    const c3 = hand[club3Idx];
+                    candidate = {
+                        cards: [c3],
+                        type: BIGTWO_TYPES.SINGLE,
+                        power: c3.rank * 10 + c3.suitRank,
+                        owner: aiPlayer.id
+                    };
+                } else {
+                    // Play lowest single or pair
+                    if (hand.length >= 2 && hand[0].value === hand[1].value) {
+                        const ev = evaluateBigTwoCombination([hand[0], hand[1]]);
+                        candidate = { cards: [hand[0], hand[1]], type: ev.type, power: ev.power, owner: aiPlayer.id };
+                    } else {
+                        const c = hand[0];
+                        candidate = { cards: [c], type: BIGTWO_TYPES.SINGLE, power: c.rank * 10 + c.suitRank, owner: aiPlayer.id };
+                    }
+                }
+            } else {
+                // Must beat last hand
+                const targetLen = lastPlayedHand.cards.length;
+
+                if (targetLen === 1) {
+                    for (let i = 0; i < hand.length; i++) {
+                        const ev = evaluateBigTwoCombination([hand[i]]);
+                        const cand = { cards: [hand[i]], type: ev.type, power: ev.power, owner: aiPlayer.id };
+                        if (canBeatLastHand(cand, lastPlayedHand)) {
+                            candidate = cand;
+                            break;
+                        }
+                    }
+                } else if (targetLen === 2) {
+                    for (let i = 0; i < hand.length - 1; i++) {
+                        if (hand[i].value === hand[i + 1].value) {
+                            const ev = evaluateBigTwoCombination([hand[i], hand[i + 1]]);
+                            const cand = { cards: [hand[i], hand[i + 1]], type: ev.type, power: ev.power, owner: aiPlayer.id };
+                            if (canBeatLastHand(cand, lastPlayedHand)) {
+                                candidate = cand;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (candidate) {
+                executeCardPlay(aiPlayer.id, candidate);
+            } else {
+                passCount++;
+                playSound('pass');
+                logBanner(`${aiPlayer.name} 選擇 Pass。`);
+                advanceTurn();
+            }
+        }
+
+        function executeCardPlay(playerId, candidate) {
+            lastPlayedHand = candidate;
+            passCount = 0;
+
+            // Remove cards from player hand
+            const p = players[playerId];
+            p.hand = p.hand.filter(c => !candidate.cards.some(played => played.id === c.id));
+
+            playSound('play');
+            selectedCards = [];
+
+            renderDeskCards(candidate.cards);
+            updateTableBoard(`${p.name} 出牌`, `${candidate.type} (${candidate.cards.length}張)`);
+            logBanner(`${p.name} 打出了【${candidate.type}】！`);
+
+            // Check Win Condition
+            if (p.hand.length === 0) {
+                endBigTwoGame(p);
+                return;
+            }
+
+            advanceTurn();
+        }
+
+        function advanceTurn() {
+            turnIndex = (turnIndex + 1) % 4;
+            processTurn();
+        }
+
+        function endBigTwoGame(winner) {
+            gameFinished = true;
+            stats.bigtwo.games++;
+
+            if (winner.id === 0) {
+                stats.bigtwo.wins++;
+                stats.bigtwo.streak++;
+                if (stats.bigtwo.streak > stats.bigtwo.maxStreak) stats.bigtwo.maxStreak = stats.bigtwo.streak;
+                stats.coins += 200;
+                playSound('win');
+                logBanner("🎉 恭喜你率先出完手牌，勇奪大老二冠軍！(+200 籌碼)");
+            } else {
+                stats.bigtwo.streak = 0;
+                stats.coins = Math.max(0, stats.coins - 50);
+                playSound('pass');
+                logBanner(`❌ 殘念！${winner.name} 獲得了大老二勝利！`);
+            }
+
+            saveStats();
+            toggleHumanControls(false);
+            document.getElementById('btn-start').classList.remove('hidden');
+        }
+
+        /* ==========================================================================
+           STREAMING_CHUNK:Old Maid Game Execution & Logic...
+           6. OLD MAID (抽鬼牌) GAME LOOP
+           ========================================================================== */
+        function startOldMaid() {
+            gameFinished = false;
+            selectedCards = [];
+
+            const deck = createStandardDeck(true); // 52 + 1 Joker = 53 cards
+
+            players.forEach((p, idx) => p.hand = []);
+            for (let i = 0; i < deck.length; i++) {
+                players[i % 4].hand.push(deck[i]);
+            }
+
+            // Auto Pair & Discard initial hands
+            logBanner("正在發牌並自動配對對消同點數手牌...");
+            playSound('card');
+
+            setTimeout(() => {
+                players.forEach(p => discardHandPairs(p));
+                renderAllHands();
+                playSound('match');
+
+                turnIndex = 0; // Human starts drawing
+                processOldMaidTurn();
+            }, 800);
+        }
+
+        function discardHandPairs(player) {
+            const newHand = [];
+            const sorted = [...player.hand].sort((a, b) => a.rank - b.rank);
+
+            let i = 0;
+            while (i < sorted.length) {
+                if (i < sorted.length - 1 && sorted[i].value === sorted[i + 1].value && !sorted[i].isJoker) {
+                    // Match found! Skip pair
+                    i += 2;
+                } else {
+                    newHand.push(sorted[i]);
+                    i++;
+                }
+            }
+            player.hand = newHand;
+        }
+
+        function processOldMaidTurn() {
+            if (gameFinished) return;
+
+            renderAllHands();
+            updateTurnBadges();
+
+            // Check if game is over (only 1 player has cards left or Joker remaining)
+            const activePlayers = players.filter(p => p.hand.length > 0);
+            if (activePlayers.length <= 1) {
+                endOldMaidGame(activePlayers[0]);
+                return;
+            }
+
+            const currentP = players[turnIndex];
+
+            // If current player has no cards, skip
+            if (currentP.hand.length === 0) {
+                advanceOldMaidTurn();
+                return;
+            }
+
+            // Find target player to draw from (next clockwise neighbor with cards)
+            let targetIdx = (turnIndex + 1) % 4;
+            while (players[targetIdx].hand.length === 0) {
+                targetIdx = (targetIdx + 1) % 4;
+            }
+
+            const targetP = players[targetIdx];
+
+            if (currentP.isAI) {
+                toggleHumanControls(false);
+                logBanner(`${currentP.name} 正在思考抽取 ${targetP.name} 的牌...`);
+                setTimeout(() => {
+                    aiDrawCardFromNeighbor(currentP, targetP);
+                }, 1200);
+            } else {
+                toggleHumanControls(true);
+                document.getElementById('btn-draw').disabled = false;
+                updateTableBoard("輪到你的回合", `點擊下方按鈕或 ${targetP.name} 的牌背進行抽牌`);
+                logBanner(`請點擊「抽取鄰居張牌」向 ${targetP.name} 抽牌！`);
+            }
+        }
+
+        function humanDrawCardFromNeighbor() {
+            if (turnIndex !== 0 || gameFinished) return;
+
+            // Target is neighbor
+            let targetIdx = 1;
+            while (players[targetIdx].hand.length === 0) {
+                targetIdx = (targetIdx + 1) % 4;
+            }
+            const targetP = players[targetIdx];
+
+            // Random draw
+            const drawnIndex = Math.floor(Math.random() * targetP.hand.length);
+            const drawnCard = targetP.hand.splice(drawnIndex, 1)[0];
+
+            players[0].hand.push(drawnCard);
+            playSound('card');
+
+            // Discard pairs if matched
+            const countBefore = players[0].hand.length;
+            discardHandPairs(players[0]);
+            if (players[0].hand.length < countBefore) {
+                playSound('match');
+                logBanner(`你抽到了 ${drawnCard.value}，成功對消配對並丟棄！`);
+            } else {
+                logBanner(`你抽到了 ${drawnCard.suit}${drawnCard.value}。`);
+            }
+
+            advanceOldMaidTurn();
+        }
+
+        function aiDrawCardFromNeighbor(aiPlayer, targetPlayer) {
+            const drawnIndex = Math.floor(Math.random() * targetPlayer.hand.length);
+            const drawnCard = targetPlayer.hand.splice(drawnIndex, 1)[0];
+
+            aiPlayer.hand.push(drawnCard);
+            playSound('card');
+
+            const countBefore = aiPlayer.hand.length;
+            discardHandPairs(aiPlayer);
+            if (aiPlayer.hand.length < countBefore) {
+                playSound('match');
+                logBanner(`${aiPlayer.name} 抽牌成功配對並丟棄一對！`);
+            } else {
+                logBanner(`${aiPlayer.name} 從 ${targetPlayer.name} 抽了一張牌。`);
+            }
+
+            advanceOldMaidTurn();
+        }
+
+        function advanceOldMaidTurn() {
+            turnIndex = (turnIndex + 1) % 4;
+            processOldMaidTurn();
+        }
+
+        function endOldMaidGame(loser) {
+            gameFinished = true;
+            stats.oldmaid.games++;
+
+            if (loser && loser.id === 0) {
+                // Player loses (held Joker)
+                stats.oldmaid.streak = 0;
+                stats.coins = Math.max(0, stats.coins - 50);
+                playSound('pass');
+                logBanner("😭 你留到了最後的鬼牌 (Joker)，挑戰失敗！");
+            } else {
+                // Player escaped win
+                stats.oldmaid.wins++;
+                stats.oldmaid.streak++;
+                if (stats.oldmaid.streak > stats.oldmaid.maxStreak) stats.oldmaid.maxStreak = stats.oldmaid.streak;
+                stats.coins += 150;
+                playSound('win');
+                logBanner(`🎉 恭喜你成功脫逃！輸家為手持鬼牌的 ${loser ? loser.name : '對手'} (+150 籌碼)`);
+            }
+
+            saveStats();
+            toggleHumanControls(false);
+            document.getElementById('btn-start').classList.remove('hidden');
+        }
+
+        /* Common Start Switcher */
+        function startGame() {
+            document.getElementById('btn-start').classList.add('hidden');
+            if (activeGame === 'bigtwo') {
+                startBigTwo();
+            } else {
+                startOldMaid();
+            }
+        }
+
+        /* ==========================================================================
+           STREAMING_CHUNK:UI Rendering & Dynamic DOM Updates...
+           7. UI RENDER ENGINE
+           ========================================================================== */
+        function renderCardHTML(card, isSelectable = false, isSelected = false, index = 0) {
+            if (card.isJoker) {
+                return `
+                    <div onclick="toggleCardSelect(${index})" class="card-item w-12 h-18 sm:w-16 sm:h-24 rounded-xl border-2 border-rose-500 bg-slate-950 p-1 flex flex-col justify-between select-none shadow-md cursor-pointer ${isSelected ? 'selected' : ''}">
+                        <div class="text-xs font-black text-rose-400">JOKER</div>
+                        <div class="text-center text-xl sm:text-2xl">🃏</div>
+                        <div class="text-[10px] text-right font-black text-rose-400">鬼牌</div>
+                    </div>
+                `;
+            }
+
+            const isRed = card.suit === '♥' || card.suit === '♦';
+            const colorClass = isRed ? 'text-rose-600' : 'text-slate-900';
+
+            return `
+                <div onclick="${isSelectable ? `toggleCardSelect(${index})` : ''}" class="card-item w-12 h-18 sm:w-16 sm:h-24 rounded-xl border border-slate-300 bg-slate-50 p-1 flex flex-col justify-between select-none shadow-md ${isSelectable ? 'cursor-pointer' : ''} ${isSelected ? 'selected' : ''}">
+                    <div class="text-left font-bold text-xs sm:text-sm leading-none ${colorClass}">
+                        ${card.value}<br><span class="text-xs">${card.suit}</span>
+                    </div>
+                    <div class="text-center text-base sm:text-xl font-black ${colorClass}">
+                        ${card.suit}
+                    </div>
+                    <div class="text-right font-bold text-xs sm:text-sm leading-none rotate-180 ${colorClass}">
+                        ${card.value}<br><span class="text-xs">${card.suit}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCardBackHTML() {
+            return `
+                <div class="w-8 h-12 sm:w-10 sm:h-14 rounded-lg bg-gradient-to-br from-blue-900 to-indigo-950 border border-blue-400/40 shadow-sm flex items-center justify-center">
+                    <span class="text-blue-400/40 text-xs">♠</span>
+                </div>
+            `;
+        }
+
+        function renderPlayerHand() {
+            const container = document.getElementById('player-hand');
+            container.innerHTML = players[0].hand.map((card, idx) => {
+                const isSelected = selectedCards.includes(idx);
+                return renderCardHTML(card, turnIndex === 0, isSelected, idx);
+            }).join('');
+            document.getElementById('player-count-badge').textContent = `(${players[0].hand.length}張)`;
+        }
+
+        function renderAllHands() {
+            renderPlayerHand();
+
+            // Render AI hand back previews
+            [1, 2, 3].forEach(id => {
+                const handElem = document.getElementById(`ai${id}-hand`);
+                const countElem = document.getElementById(`ai${id}-count`);
+                const cardsCount = players[id].hand.length;
+
+                countElem.textContent = `${cardsCount} 張`;
+                handElem.innerHTML = Array(Math.min(cardsCount, 10)).fill(0).map(() => renderCardBackHTML()).join('');
+            });
+        }
+
+        function toggleCardSelect(index) {
+            if (turnIndex !== 0 || gameFinished) return;
+            const pos = selectedCards.indexOf(index);
+            if (pos > -1) {
+                selectedCards.splice(pos, 1);
+            } else {
+                selectedCards.push(index);
+            }
+            playSound('card');
+            renderPlayerHand();
+        }
+
+        function renderDeskCards(cards) {
+            const desk = document.getElementById('desk-cards');
+            if (!cards || cards.length === 0) {
+                desk.innerHTML = '<span class="text-xs text-slate-400 italic">無牌</span>';
+                return;
+            }
+            desk.innerHTML = cards.map(c => renderCardHTML(c, false, false, 0)).join('');
+        }
+
+        function updateTurnBadges() {
+            [0, 1, 2, 3].forEach(id => {
+                const badge = id === 0 ? null : document.getElementById(`ai${id}-badge`);
+                if (!badge) return;
+
+                if (id === turnIndex) {
+                    badge.textContent = '出牌中';
+                    badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 border border-amber-300 font-bold animate-pulse';
+                } else {
+                    badge.textContent = '等待中';
+                    badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-bold';
+                }
+            });
+        }
+
+        function toggleHumanControls(enable) {
+            document.getElementById('btn-play').disabled = !enable;
+            document.getElementById('btn-hint').disabled = !enable;
+            document.getElementById('btn-pass').disabled = !enable;
+            document.getElementById('btn-draw').disabled = !enable;
+        }
+
+        function updateTableBoard(title, comboType) {
+            document.getElementById('board-title').textContent = title;
+            document.getElementById('board-combo-type').textContent = comboType;
+        }
+
+        function logBanner(msg) {
+            document.getElementById('status-banner').textContent = msg;
+            logFooter(msg);
+        }
+
+        function logFooter(msg) {
+            document.getElementById('footer-status').textContent = msg;
+        }
+
+        function resetTableUI() {
+            renderDeskCards([]);
+            updateTableBoard("當前桌面牌型", "自由出牌");
+            document.getElementById('player-hand').innerHTML = '';
+            [1, 2, 3].forEach(id => {
+                document.getElementById(`ai${id}-hand`).innerHTML = '';
+                document.getElementById(`ai${id}-count`).textContent = '13 張';
+            });
+            document.getElementById('btn-start').classList.remove('hidden');
+        }
+
+        function updateStatsUI() {
+            document.getElementById('nav-coins').textContent = stats.coins.toLocaleString();
+
+            // Lobby Summary Text
+            const btWinrate = stats.bigtwo.games > 0 ? Math.round((stats.bigtwo.wins / stats.bigtwo.games) * 100) : 0;
+            const omWinrate = stats.oldmaid.games > 0 ? Math.round((stats.oldmaid.wins / stats.oldmaid.games) * 100) : 0;
+
+            document.getElementById('lobby-bigtwo-stats').textContent = `勝率: ${btWinrate}% (${stats.bigtwo.wins}勝/${stats.bigtwo.games}場)`;
+            document.getElementById('lobby-oldmaid-stats').textContent = `勝率: ${omWinrate}% (${stats.oldmaid.wins}勝/${stats.oldmaid.games}場)`;
+
+            // Modal detailed stats
+            document.getElementById('stat-bigtwo-games').textContent = stats.bigtwo.games;
+            document.getElementById('stat-bigtwo-wins').textContent = stats.bigtwo.wins;
+            document.getElementById('stat-bigtwo-streak').textContent = stats.bigtwo.maxStreak;
+            document.getElementById('stat-bigtwo-winrate').textContent = `勝率 ${btWinrate}%`;
+
+            document.getElementById('stat-oldmaid-games').textContent = stats.oldmaid.games;
+            document.getElementById('stat-oldmaid-wins').textContent = stats.oldmaid.wins;
+            document.getElementById('stat-oldmaid-streak').textContent = stats.oldmaid.maxStreak;
+            document.getElementById('stat-oldmaid-winrate').textContent = `勝率 ${omWinrate}%`;
+        }
+
+        /* Modal Controllers */
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        /* Initializer */
+        window.onload = function() {
+            loadStats();
+        };
+    </script>
+</body>
+</html>
